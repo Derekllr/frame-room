@@ -1,0 +1,1126 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="Compare two photos at a time, choose your favorites, and export a shortlist. All photo processing stays on your device.">
+<title>Frame Room · 摄影盲选</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='5' fill='%23212624'/%3E%3Cpath d='M8 13V8h5m6 0h5v5m0 6v5h-5m-6 0H8v-5' fill='none' stroke='%23ecb76c' stroke-width='2'/%3E%3Ccircle cx='16' cy='16' r='3' fill='%23ecb76c'/%3E%3C/svg%3E">
+<style>
+:root {
+  color-scheme: dark;
+  --ground:#171918; --shell:#1d201e; --panel:#222622; --well:#101211;
+  --border:#343a35; --line:#2b302c; --ink:#eeeee7; --muted:#a9b0a8; --faint:#818980;
+  --accent:#eabc7a; --accent-ink:#231b0f; --green:#a7bba2;
+  --mono:"Cascadia Mono",Consolas,monospace;
+  font:14px/1.5 "Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+}
+* { box-sizing:border-box; }
+[hidden] { display:none !important; }
+body { margin:0; background:var(--ground); color:var(--ink); }
+button,select,input { font:inherit; }
+button,select { color:inherit; }
+button { cursor:pointer; }
+button:disabled { cursor:not-allowed; opacity:.46; }
+button:focus-visible,a:focus-visible,select:focus-visible,summary:focus-visible {
+  outline:2px solid var(--accent); outline-offset:3px;
+}
+button { border:1px solid transparent; background:none; border-radius:4px; }
+a { color:var(--accent); }
+h1,h2,p { margin:0; }
+img { display:block; max-width:100%; }
+.bar {
+  display:flex; justify-content:space-between; align-items:center; gap:16px;
+  min-height:68px; padding:0 30px; border-bottom:1px solid var(--border); background:var(--shell);
+}
+.brand { display:flex; align-items:center; gap:11px; white-space:nowrap; }
+.brand svg { color:var(--accent); }
+.brand strong { display:block; font-size:18px; font-weight:650; line-height:1.25; letter-spacing:-.4px; }
+.brand span { display:block; font-size:11px; color:var(--muted); margin-top:2px; }
+.top-actions { display:flex; gap:10px; align-items:center; }
+.top-actions select {
+  border:1px solid var(--border); border-radius:4px; background:var(--shell); padding:7px 8px; min-height:36px; font-size:12px;
+}
+.primary,.secondary,.quiet,.icon-button,.danger {
+  min-height:36px; padding:7px 12px; font-weight:550; white-space:nowrap;
+}
+.primary { background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+.primary:not(:disabled):hover { background:#f5cb92; }
+.secondary,.icon-button { border-color:var(--border); background:var(--panel); }
+.secondary:not(:disabled):hover,.icon-button:not(:disabled):hover,.quiet:not(:disabled):hover { background:#2c332e; }
+.icon-button { width:36px; height:36px; padding:0; font:16px var(--mono); color:var(--muted); }
+.quiet { color:var(--muted); font-size:12px; }
+.danger { color:#ffb7a6; border-color:#744a40; background:#342422; }
+.layout { display:grid; grid-template-columns:218px minmax(0,1fr); min-height:calc(100vh - 68px); }
+.sidebar {
+  background:var(--shell); border-right:1px solid var(--border); padding:27px 16px 18px;
+  display:flex; flex-direction:column; gap:20px;
+}
+.session { padding:0 8px; display:grid; gap:5px; justify-items:start; }
+.overline { color:var(--faint); font:10px/1.5 var(--mono); letter-spacing:.1em; text-transform:uppercase; }
+.session strong { font-size:15px; font-weight:600; }
+.tag { color:var(--green); background:#29332a; border:1px solid #3c493d; border-radius:3px; font:10px/1.5 var(--mono); padding:2px 5px; }
+#views { display:grid; gap:4px; }
+.nav-item {
+  width:100%; min-height:40px; display:grid; grid-template-columns:18px minmax(0,1fr) auto; align-items:center;
+  gap:9px; padding:6px 9px; text-align:left; color:var(--muted);
+}
+.nav-item:hover { background:var(--panel); color:var(--ink); }
+.nav-item[aria-current="page"] {
+  color:var(--ink); border-color:var(--border); border-left-color:var(--accent); background:#292d29;
+}
+.nav-item small,.nav-mark { font-family:var(--mono); }
+.nav-item small { font-size:10px; color:var(--faint); }
+.nav-mark { font-size:16px; color:var(--accent); }
+.stats { border-top:1px solid var(--line); padding:14px 8px 0; display:grid; gap:9px; }
+.metric { display:flex; justify-content:space-between; gap:8px; align-items:baseline; font-size:12px; color:var(--muted); }
+.metric strong { color:var(--ink); font:12px var(--mono); }
+.metric.bytes { border-top:1px solid var(--line); padding-top:12px; margin-top:3px; }
+.sidebar-bottom { margin-top:auto; display:grid; gap:10px; justify-items:start; padding-left:8px; }
+.privacy { display:flex; align-items:center; gap:7px; font-size:11px; color:var(--muted); }
+.privacy i { width:6px; height:6px; border-radius:50%; background:var(--green); flex:none; }
+.sidebar-bottom .quiet { padding-left:0; min-height:28px; }
+.main { padding:25px clamp(18px,3vw,42px) 20px; min-width:0; }
+#screen,.import-status { max-width:1350px; margin-inline:auto; }
+.screen-head { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:19px; }
+.screen-title h1 { font-size:clamp(21px,2.45vw,30px); font-weight:620; letter-spacing:-.035em; line-height:1.2; }
+.screen-title p { margin-top:7px; color:var(--muted); font-size:13px; }
+.round { min-width:145px; text-align:right; }
+.round strong { font:12px var(--mono); color:var(--ink); }
+progress {
+  display:block; width:100%; height:5px; border:none; appearance:none; background:var(--line); color:var(--accent);
+}
+progress::-webkit-progress-bar { background:var(--line); }
+progress::-webkit-progress-value { background:var(--accent); }
+progress::-moz-progress-bar { background:var(--accent); }
+.round progress { margin-top:8px; }
+.duel-pair { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:13px; }
+.duel-card { min-width:0; border:1px solid var(--border); background:var(--shell); border-radius:5px; overflow:hidden; }
+.frame {
+  width:100%; display:block; position:relative; border:0; padding:0; border-radius:0;
+  height:clamp(210px,34vw,460px); background:var(--well);
+}
+.frame img { width:100%; height:100%; object-fit:contain; }
+.frame:focus-visible { outline-offset:-3px; }
+.frame:hover .zoom { color:var(--accent); }
+.frame-index,.zoom {
+  position:absolute; top:10px; width:29px; height:27px; display:grid; place-items:center;
+  background:#141815e8; border:1px solid #ffffff38; border-radius:3px; font:12px var(--mono); color:#f5f5ec;
+}
+.frame-index { left:10px; }
+.zoom { right:10px; font-size:17px; }
+.choose {
+  width:100%; min-height:49px; display:flex; align-items:center; gap:9px; justify-content:center;
+  border:0; border-top:1px solid var(--border); border-radius:0; background:#252b26; color:var(--ink); font-weight:600;
+}
+.choose:not(:disabled):hover { background:var(--accent); color:var(--accent-ink); }
+kbd {
+  min-width:21px; display:inline-grid; place-items:center; padding:1px 4px; border:1px solid #626a62;
+  border-radius:3px; font:11px/1.4 var(--mono); color:inherit;
+}
+.duel-actions { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin:14px 0 15px; }
+.duel-actions .secondary { min-height:35px; font-size:12px; }
+.shortcuts { display:flex; flex-wrap:wrap; gap:10px 18px; font-size:11px; color:var(--muted); }
+.shortcuts span { display:inline-flex; align-items:center; gap:5px; }
+.screen-foot {
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  border-top:1px solid var(--line); padding:12px 0 0; color:var(--faint); font-size:11px;
+}
+.sheet-note { color:var(--muted); font:10px var(--mono); }
+.empty {
+  min-height:330px; display:grid; align-content:center; justify-items:center; gap:12px;
+  border:1px dashed #475046; border-radius:5px; background:var(--shell); padding:28px;
+  text-align:center;
+}
+.empty-symbol { font:36px var(--mono); color:var(--accent); margin-bottom:4px; }
+.empty h2 { font-size:19px; font-weight:600; }
+.empty p { color:var(--muted); max-width:420px; }
+.empty-actions,.exports { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+.exports { justify-content:flex-start; margin-bottom:15px; }
+.exports .primary,.exports .secondary { font-size:12px; }
+.file-list { display:grid; gap:6px; }
+.file-row {
+  display:grid; grid-template-columns:46px 90px minmax(100px,1fr) minmax(130px,auto) auto;
+  align-items:center; gap:13px; padding:8px 10px; border:1px solid var(--line); background:var(--shell); border-radius:4px;
+}
+.file-row .position { color:var(--faint); font:13px var(--mono); text-align:center; }
+.file-row .position.top { color:var(--accent); }
+.file-thumb { padding:0; width:90px; height:60px; border:0; overflow:hidden; background:var(--well); }
+.file-thumb img { width:100%; height:100%; object-fit:contain; }
+.file-name { min-width:0; }
+.file-name strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px; font-weight:600; }
+.file-name small,.file-detail small { color:var(--muted); display:block; font:11px/1.6 var(--mono); margin-top:3px; }
+.file-detail { text-align:right; font:12px var(--mono); }
+.file-detail b { font-weight:500; color:var(--accent); }
+.file-actions { display:flex; gap:5px; }
+.pick[aria-pressed="true"] { color:var(--accent); border-color:#7e6848; background:#332c21; }
+.section-note { margin:13px 0; color:var(--muted); font-size:12px; }
+.import-status { background:var(--shell); border:1px solid var(--border); border-radius:4px; padding:10px 12px 12px; margin-bottom:16px; }
+.import-line { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:5px; }
+.import-line strong { font-size:12px; font-weight:500; }
+.import-errors { margin:9px 0 0; padding-left:18px; color:#efb4a5; font-size:12px; overflow-wrap:anywhere; }
+.drop-overlay { position:fixed; inset:0; z-index:9; background:#101611e8; display:grid; place-items:center; pointer-events:none; }
+.drop-overlay > div { display:grid; place-items:center; gap:12px; padding:40px; border:1px dashed var(--accent); }
+.drop-overlay span { font:30px var(--mono); color:var(--accent); }
+.drop-overlay small { color:var(--muted); }
+#toast { position:fixed; z-index:11; bottom:18px; left:50%; transform:translateX(-50%); width:max-content; max-width:min(560px,90vw); }
+#toast:not(:empty) { background:#303931; border:1px solid #526052; border-radius:4px; padding:10px 13px; font-size:13px; box-shadow:0 3px 16px #0006; }
+dialog { width:min(580px,calc(100% - 28px)); border:1px solid var(--border); border-radius:5px; background:var(--shell); color:var(--ink); padding:0; }
+dialog::backdrop { background:#070a08cb; }
+.dialog-head { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:13px 18px; border-bottom:1px solid var(--border); }
+.dialog-head h2 { font-size:16px; font-weight:600; overflow-wrap:anywhere; }
+.dialog-body { padding:15px 18px 20px; }
+.dialog-body p { color:var(--muted); font-size:13px; margin:0 0 12px; }
+.dialog-body details { border-top:1px solid var(--border); margin-top:15px; padding-top:12px; color:var(--muted); font-size:12px; }
+.dialog-body summary { cursor:pointer; }
+.help-keys { padding-top:4px; }
+.inspect-dialog { width:min(1040px,calc(100% - 28px)); }
+.inspect-dialog img { width:100%; height:min(68vh,730px); object-fit:contain; background:var(--well); }
+.inspect-dialog p { color:var(--muted); padding:10px 18px; font:12px var(--mono); }
+.confirm-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:15px; }
+@media (min-width:1550px) { .main { padding-top:32px; } }
+@media (max-width:870px) {
+  .layout { grid-template-columns:173px minmax(0,1fr); }
+  .sidebar { padding-inline:10px; }
+  .main { padding-inline:17px; }
+  .file-row { grid-template-columns:28px 62px minmax(0,1fr) auto; gap:8px; }
+  .file-thumb { width:62px; height:46px; }
+  .file-detail { grid-column:3; grid-row:2; text-align:left; }
+  .file-detail small { display:inline; margin-left:6px; }
+  .file-actions { grid-column:4; grid-row:1; }
+}
+@media (max-width:640px) {
+  .bar { padding:10px 12px; gap:8px; min-height:61px; }
+  .brand { gap:5px; }
+  .brand svg { width:24px; height:24px; }
+  .brand strong { font-size:15px; }
+  .brand span { font-size:9px; }
+  .top-actions { gap:5px; }
+  .top-actions .primary { font-size:12px; padding-inline:8px; }
+  .top-actions select { padding-inline:3px; max-width:66px; font-size:11px; }
+  .top-actions .icon-button { width:28px; }
+  .layout { grid-template-columns:minmax(0,1fr); }
+  .sidebar { padding:8px 11px; gap:7px; border-right:0; border-bottom:1px solid var(--border); }
+  .session { display:flex; gap:7px; align-items:center; padding:2px 3px; }
+  .session .overline { display:none; }
+  .session strong { font-size:11px; }
+  #views { grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px; }
+  .nav-item { gap:4px; font-size:11px; grid-template-columns:12px minmax(0,1fr) auto; padding-inline:4px; min-height:35px; }
+  .nav-mark { font-size:13px; }
+  .nav-item small { font-size:9px; }
+  .stats { display:none; }
+  .sidebar-bottom { display:flex; justify-content:space-between; padding-left:3px; }
+  .sidebar-bottom .quiet { padding:2px 0; min-height:24px; font-size:11px; }
+  .privacy { font-size:10px; }
+  .main { padding:15px 11px; }
+  .screen-head { align-items:flex-start; gap:7px; margin-bottom:12px; }
+  .screen-title p { font-size:11px; }
+  .round { min-width:83px; }
+  .round strong { font-size:10px; }
+  .duel-pair { gap:7px; }
+  .frame { height:clamp(132px,48vw,310px); }
+  .frame-index,.zoom { top:5px; width:24px; height:23px; font-size:11px; }
+  .frame-index { left:5px; } .zoom { right:5px; font-size:14px; }
+  .choose { font-size:12px; gap:6px; min-height:44px; }
+  .duel-actions { gap:5px; }
+  .duel-actions .secondary { padding-inline:8px; min-height:40px; }
+  .screen-foot { align-items:flex-start; flex-direction:column; }
+  .shortcuts { gap:7px 10px; font-size:10px; }
+  .file-row { padding-inline:5px; }
+  .file-actions .icon-button { width:32px; }
+}
+@media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto !important; } }
+
+</style>
+</head>
+<body>
+<header class="bar">
+  <div class="brand">
+    <svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><path d="M6 12V6h6m8 0h6v6m0 8v6h-6m-8 0H6v-6" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="16" cy="16" r="3" fill="currentColor"/></svg>
+    <div><strong>Frame Room</strong><span data-copy="brand"></span></div>
+  </div>
+  <div class="top-actions">
+    <select id="language" aria-label="语言 / Language"><option value="zh">中文</option><option value="en">English</option></select>
+    <button class="icon-button" data-action="help" data-label="help" type="button">?</button>
+    <button id="import-button" class="primary" data-action="import" type="button"><span aria-hidden="true">+</span> <span data-copy="import"></span></button>
+    <input id="file-input" type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" multiple hidden>
+  </div>
+</header>
+<div class="layout">
+  <aside class="sidebar" aria-label="Workspace">
+    <div class="session">
+      <div class="overline" data-copy="session"></div>
+      <strong id="session-name"></strong>
+      <span id="session-tag" class="tag"></span>
+    </div>
+    <nav id="views" aria-label="Views">
+      <button class="nav-item" data-action="view" data-view="duel" type="button"><span class="nav-mark" aria-hidden="true">◫</span><span data-copy="duel"></span><small>01</small></button>
+      <button class="nav-item" data-action="view" data-view="library" type="button"><span class="nav-mark" aria-hidden="true">⊞</span><span data-copy="library"></span><small id="nav-count">00</small></button>
+      <button class="nav-item" data-action="view" data-view="rank" type="button"><span class="nav-mark" aria-hidden="true">≡</span><span data-copy="rank"></span><small>03</small></button>
+    </nav>
+    <div class="stats" id="stats"></div>
+    <div class="sidebar-bottom">
+      <div class="privacy"><i aria-hidden="true"></i><span data-copy="local"></span></div>
+      <button id="clear-button" class="quiet" data-action="clear" type="button" data-copy="clear"></button>
+    </div>
+  </aside>
+  <main id="main" class="main">
+    <div id="import-status" class="import-status" hidden>
+      <div class="import-line"><strong id="import-label"></strong><button id="cancel-import" class="quiet" data-action="cancel" data-copy="cancel" type="button"></button></div>
+      <progress id="import-progress" value="0" max="1"></progress>
+    </div>
+    <div id="screen"></div>
+  </main>
+</div>
+<div id="drop-overlay" class="drop-overlay" hidden><div><span aria-hidden="true">↓</span><strong data-copy="drop"></strong><small data-copy="formats"></small></div></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<dialog id="help-dialog" aria-labelledby="help-title">
+  <div class="dialog-head"><h2 id="help-title" data-copy="help"></h2><button class="icon-button" data-action="close" data-label="close" type="button">×</button></div>
+  <div class="dialog-body">
+    <p data-copy="helpDuel"></p><p data-copy="helpRank"></p><p data-copy="helpFiles"></p><p data-copy="helpStorage"></p>
+    <div class="shortcuts help-keys" id="help-keys"></div>
+    <details><summary data-copy="credits"></summary><ul id="credits-list"></ul></details>
+  </div>
+</dialog>
+<dialog id="inspect-dialog" class="inspect-dialog" aria-labelledby="inspect-title">
+  <div class="dialog-head"><h2 id="inspect-title"></h2><button class="icon-button" data-action="close" data-label="close" type="button">×</button></div>
+  <img id="inspect-image" alt="">
+  <p id="inspect-caption"></p>
+</dialog>
+<dialog id="confirm-dialog" aria-labelledby="confirm-title">
+  <div class="dialog-head"><h2 id="confirm-title"></h2><button class="icon-button" data-action="close" data-label="close" type="button">×</button></div>
+  <div class="dialog-body"><p id="confirm-text"></p><div class="confirm-actions"><button class="secondary" data-action="close" data-copy="back" type="button"></button><button class="danger" data-action="confirm" data-copy="confirm" type="button"></button></div></div>
+</dialog>
+<script type="module">
+const WORKER_SOURCE = "const LIMITS = Object.freeze({ count: 100, bytes: 60 * 1024 ** 2, pixels: 80_000_000, edge: 1600, target: 500_000, shelf: 60 * 1024 ** 2 });\nclass PhotoError extends Error {\n  constructor(code) { super(code); this.code = code; }\n}\n\nfunction fit(width, height, edge) {\n  const scale = Math.min(1, edge / Math.max(width, height));\n  return {width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale))};\n}\n\nfunction jpegOrientation(view, start, end) {\n  if (end - start < 14 || view.getUint32(start) !== 0x45786966 || view.getUint16(start + 4) !== 0) return 1;\n  const offset = start + 6;\n  const endian = view.getUint16(offset);\n  if (endian !== 0x4949 && endian !== 0x4d4d) return 1;\n  const le = endian === 0x4949;\n  if (view.getUint16(offset + 2, le) !== 42) return 1;\n  const dir = offset + view.getUint32(offset + 4, le);\n  if (dir < offset + 8 || dir + 2 > end) return 1;\n  const entries = view.getUint16(dir, le);\n  for (let i = 0; i < entries; i++) {\n    const at = dir + 2 + i * 12;\n    if (at + 12 > end) break;\n    if (view.getUint16(at, le) === 0x112 && view.getUint16(at + 2, le) === 3 && view.getUint32(at + 4, le) === 1) {\n      const value = view.getUint16(at + 8, le);\n      return value >= 1 && value <= 8 ? value : 1;\n    }\n  }\n  return 1;\n}\n\nfunction photoHeader(buffer) {\n  const view = new DataView(buffer);\n  const n = view.byteLength;\n  let width = 0, height = 0, orientation = 1, type;\n  if (n >= 24 && view.getUint32(0) === 0x89504e47 && view.getUint32(4) === 0x0d0a1a0a && view.getUint32(12) === 0x49484452) {\n    type = 'image/png';\n    width = view.getUint32(16); height = view.getUint32(20);\n    for (let at = 8; at + 12 <= n;) {\n      const size = view.getUint32(at), tag = view.getUint32(at + 4);\n      if (tag === 0x6163544c) throw new PhotoError('animated');\n      if (tag === 0x49444154 || at + 12 + size > n) break;\n      at += size + 12;\n    }\n  } else if (n >= 30 && view.getUint32(0) === 0x52494646 && view.getUint32(8) === 0x57454250) {\n    type = 'image/webp';\n    const tag = view.getUint32(12);\n    if (tag === 0x56503858) {\n      if (view.getUint8(20) & 2) throw new PhotoError('animated');\n      const u24 = at => view.getUint8(at) + 256 * view.getUint8(at + 1) + 65536 * view.getUint8(at + 2);\n      width = 1 + u24(24); height = 1 + u24(27);\n    } else if (tag === 0x5650384c && view.getUint8(20) === 0x2f) {\n      const packed = view.getUint32(21, true);\n      width = 1 + (packed & 0x3fff); height = 1 + ((packed >>> 14) & 0x3fff);\n    } else if (tag === 0x56503820 && view.getUint8(23) === 0x9d && view.getUint8(24) === 1 && view.getUint8(25) === 0x2a) {\n      width = view.getUint16(26, true) & 0x3fff; height = view.getUint16(28, true) & 0x3fff;\n    }\n  } else if (n >= 4 && view.getUint16(0) === 0xffd8) {\n    type = 'image/jpeg';\n    let at = 2;\n    while (at + 3 < n && view.getUint8(at++) === 0xff) {\n      while (at < n && view.getUint8(at) === 0xff) at++;\n      if (at + 2 >= n) break;\n      const marker = view.getUint8(at++);\n      if (marker === 0xda || marker === 0xd9) break;\n      if (marker === 1 || (marker >= 0xd0 && marker <= 0xd7)) continue;\n      const length = view.getUint16(at);\n      if (length < 2 || at + length > n) break;\n      if (marker === 0xe1 && length >= 16 && view.getUint32(at + 2) === 0x45786966) {\n        orientation = jpegOrientation(view, at + 2, at + length);\n      }\n      if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker) && length >= 8) {\n        height = view.getUint16(at + 3); width = view.getUint16(at + 5);\n      }\n      at += length;\n    }\n  }\n  if (!type) throw new PhotoError('unsupported');\n  if (!width || !height) throw new PhotoError('unreadable');\n  if (width * height > LIMITS.pixels) throw new PhotoError('pixels');\n  if (orientation >= 5) [width, height] = [height, width];\n  return {width, height, orientation, type};\n}\n\nfunction pairKey(a, b) { return a < b ? a + '|' + b : b + '|' + a; }\n\nfunction standings(photos, votes) {\n  const stats = new Map(photos.map((photo, index) => [photo.id, {photo, index, rating:1000, played:0, wins:0, ties:0}]));\n  const pairCounts = new Map();\n  for (const {a, b, outcome} of votes) {\n    const x = stats.get(a), y = stats.get(b);\n    if (!x || !y || x === y || !['a', 'b', 'tie'].includes(outcome)) continue;\n    const expected = 1 / (1 + 10 ** ((y.rating - x.rating) / 400));\n    const actual = outcome === 'a' ? 1 : outcome === 'b' ? 0 : 0.5;\n    const change = 32 * (actual - expected);\n    x.rating += change; y.rating -= change;\n    x.played++; y.played++;\n    if (outcome === 'a') x.wins++;\n    else if (outcome === 'b') y.wins++;\n    else { x.ties++; y.ties++; }\n    const key = pairKey(a, b);\n    pairCounts.set(key, (pairCounts.get(key) || 0) + 1);\n  }\n  const ranked = [...stats.values()].sort((a, b) => Number(b.played > 0) - Number(a.played > 0) || b.rating - a.rating || a.index - b.index);\n  return { ranked, pairCounts };\n}\n\nfunction nextPair(photos, votes, previous, random = Math.random) {\n  if (photos.length < 2) return null;\n  const { ranked, pairCounts } = standings(photos, votes);\n  const shuffled = ranked.map(item => ({...item, roll:random()})).sort((a, b) => a.played - b.played || a.roll - b.roll);\n  const a = shuffled[0];\n  let candidates = shuffled.slice(1);\n  if (previous && photos.length > 2) {\n    const last = pairKey(previous.a, previous.b);\n    candidates = candidates.filter(b => pairKey(a.photo.id, b.photo.id) !== last);\n  }\n  const priorMeetings = b => pairCounts.get(pairKey(a.photo.id, b.photo.id)) || 0;\n  candidates.sort((b, c) => b.played - c.played || priorMeetings(b) - priorMeetings(c) || b.roll - c.roll);\n  const b = candidates[0];\n  return random() < .5 ? {a:a.photo.id, b:b.photo.id} : {a:b.photo.id, b:a.photo.id};\n}\n\nfunction exportName(name) {\n  return name.replace(/\\.[^.]+$/, '').replace(/[\\u0000-\\u001f\\u007f<>:\"/\\\\|?*]/g, '_').replace(/^[. ]+|[. ]+$/g, '').slice(0, 80) || 'photo';\n}\n\n\nfunction canvasOf(width, height) {\n  if (typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(width, height);\n  const canvas = document.createElement('canvas');\n  canvas.width = width; canvas.height = height;\n  return canvas;\n}\n\nfunction jpegOf(canvas, quality) {\n  if ('convertToBlob' in canvas) return canvas.convertToBlob({type:'image/jpeg', quality});\n  return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new PhotoError('unreadable')), 'image/jpeg', quality));\n}\n\nasync function processPhoto(file) {\n  if (!file.size) throw new PhotoError('unreadable');\n  if (file.size > LIMITS.bytes) throw new PhotoError('fileLarge');\n  const original = photoHeader(await file.slice(0, 512 * 1024).arrayBuffer());\n  const target = fit(original.width, original.height, LIMITS.edge);\n  let bitmap, canvas, thumb;\n  try {\n    bitmap = await createImageBitmap(file, { imageOrientation:'from-image', resizeWidth:target.width, resizeHeight:target.height, resizeQuality:'high' });\n    let { width, height } = target;\n    canvas = canvasOf(width, height);\n    const ctx = canvas.getContext('2d', {alpha:false});\n    if (!ctx) throw new PhotoError('unreadable');\n    const draw = () => {\n      ctx.fillStyle = '#ffffff';\n      ctx.fillRect(0, 0, width, height);\n      ctx.imageSmoothingQuality = 'high';\n      ctx.drawImage(bitmap, 0, 0, width, height);\n    };\n    draw();\n    // Avoid inflating already optimized inputs; don't chase tiny files at the expense of detail.\n    const budget = Math.min(LIMITS.target, Math.max(16_000, Math.floor(file.size * .90)));\n    let blob;\n    for (const quality of [.84, .76, .66, .56]) {\n      blob = await jpegOf(canvas, quality);\n      if (blob.size <= budget) break;\n    }\n    if (blob.size > budget && Math.max(width, height) > 1160) {\n      ({width, height} = fit(width, height, 1160));\n      canvas.width = width; canvas.height = height;\n      draw();\n      blob = await jpegOf(canvas, .66);\n    }\n    bitmap.close(); bitmap = null;\n    const t = fit(width, height, 300);\n    thumb = canvasOf(t.width, t.height);\n    thumb.getContext('2d', {alpha:false}).drawImage(canvas, 0, 0, t.width, t.height);\n    const thumbnail = await jpegOf(thumb, .72);\n    return { name:file.name, originalBytes:file.size, originalWidth:original.width, originalHeight:original.height,\n      bytes:blob.size, width, height, blob, thumbnail };\n  } catch (error) {\n    if (error instanceof PhotoError) throw error;\n    throw new PhotoError('unreadable');\n  } finally {\n    bitmap?.close();\n    if (canvas) { canvas.width = 1; canvas.height = 1; }\n    if (thumb) { thumb.width = 1; thumb.height = 1; }\n  }\n}\n\n\nself.onmessage = async ({data:{id, file}}) => {\n  try {\n    const photo = await processPhoto(file);\n    self.postMessage({id, photo});\n  } catch (error) {\n    self.postMessage({id, error:error.code || 'unreadable'});\n  }\n};\n";
+const DEMO = [{"name":"1015.jpg","author":"Alexey Topolyanskiy","url":"https://unsplash.com/photos/-oWyJoSqBRM"},{"name":"1016.jpg","author":"Philippe Wuyts","url":"https://unsplash.com/photos/_h7aBovKia4"},{"name":"1018.jpg","author":"Andrew Ridley","url":"https://unsplash.com/photos/Kt5hRENuotI"},{"name":"1036.jpg","author":"Wolfgang Lutz","url":"https://unsplash.com/photos/yOujaSETXlo"},{"name":"1043.jpg","author":"Christian Joudrey","url":"https://unsplash.com/photos/mWRR1xj95hg"},{"name":"1067.jpg","author":"Kevin Young","url":"https://unsplash.com/photos/-icmOdYWXuQ"}];
+const LIMITS = Object.freeze({ count: 100, bytes: 60 * 1024 ** 2, pixels: 80_000_000, edge: 1600, target: 500_000, shelf: 60 * 1024 ** 2 });
+class PhotoError extends Error {
+  constructor(code) { super(code); this.code = code; }
+}
+
+function fit(width, height, edge) {
+  const scale = Math.min(1, edge / Math.max(width, height));
+  return {width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale))};
+}
+
+function jpegOrientation(view, start, end) {
+  if (end - start < 14 || view.getUint32(start) !== 0x45786966 || view.getUint16(start + 4) !== 0) return 1;
+  const offset = start + 6;
+  const endian = view.getUint16(offset);
+  if (endian !== 0x4949 && endian !== 0x4d4d) return 1;
+  const le = endian === 0x4949;
+  if (view.getUint16(offset + 2, le) !== 42) return 1;
+  const dir = offset + view.getUint32(offset + 4, le);
+  if (dir < offset + 8 || dir + 2 > end) return 1;
+  const entries = view.getUint16(dir, le);
+  for (let i = 0; i < entries; i++) {
+    const at = dir + 2 + i * 12;
+    if (at + 12 > end) break;
+    if (view.getUint16(at, le) === 0x112 && view.getUint16(at + 2, le) === 3 && view.getUint32(at + 4, le) === 1) {
+      const value = view.getUint16(at + 8, le);
+      return value >= 1 && value <= 8 ? value : 1;
+    }
+  }
+  return 1;
+}
+
+function photoHeader(buffer) {
+  const view = new DataView(buffer);
+  const n = view.byteLength;
+  let width = 0, height = 0, orientation = 1, type;
+  if (n >= 24 && view.getUint32(0) === 0x89504e47 && view.getUint32(4) === 0x0d0a1a0a && view.getUint32(12) === 0x49484452) {
+    type = 'image/png';
+    width = view.getUint32(16); height = view.getUint32(20);
+    for (let at = 8; at + 12 <= n;) {
+      const size = view.getUint32(at), tag = view.getUint32(at + 4);
+      if (tag === 0x6163544c) throw new PhotoError('animated');
+      if (tag === 0x49444154 || at + 12 + size > n) break;
+      at += size + 12;
+    }
+  } else if (n >= 30 && view.getUint32(0) === 0x52494646 && view.getUint32(8) === 0x57454250) {
+    type = 'image/webp';
+    const tag = view.getUint32(12);
+    if (tag === 0x56503858) {
+      if (view.getUint8(20) & 2) throw new PhotoError('animated');
+      const u24 = at => view.getUint8(at) + 256 * view.getUint8(at + 1) + 65536 * view.getUint8(at + 2);
+      width = 1 + u24(24); height = 1 + u24(27);
+    } else if (tag === 0x5650384c && view.getUint8(20) === 0x2f) {
+      const packed = view.getUint32(21, true);
+      width = 1 + (packed & 0x3fff); height = 1 + ((packed >>> 14) & 0x3fff);
+    } else if (tag === 0x56503820 && view.getUint8(23) === 0x9d && view.getUint8(24) === 1 && view.getUint8(25) === 0x2a) {
+      width = view.getUint16(26, true) & 0x3fff; height = view.getUint16(28, true) & 0x3fff;
+    }
+  } else if (n >= 4 && view.getUint16(0) === 0xffd8) {
+    type = 'image/jpeg';
+    let at = 2;
+    while (at + 3 < n && view.getUint8(at++) === 0xff) {
+      while (at < n && view.getUint8(at) === 0xff) at++;
+      if (at + 2 >= n) break;
+      const marker = view.getUint8(at++);
+      if (marker === 0xda || marker === 0xd9) break;
+      if (marker === 1 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+      const length = view.getUint16(at);
+      if (length < 2 || at + length > n) break;
+      if (marker === 0xe1 && length >= 16 && view.getUint32(at + 2) === 0x45786966) {
+        orientation = jpegOrientation(view, at + 2, at + length);
+      }
+      if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker) && length >= 8) {
+        height = view.getUint16(at + 3); width = view.getUint16(at + 5);
+      }
+      at += length;
+    }
+  }
+  if (!type) throw new PhotoError('unsupported');
+  if (!width || !height) throw new PhotoError('unreadable');
+  if (width * height > LIMITS.pixels) throw new PhotoError('pixels');
+  if (orientation >= 5) [width, height] = [height, width];
+  return {width, height, orientation, type};
+}
+
+function pairKey(a, b) { return a < b ? a + '|' + b : b + '|' + a; }
+
+function standings(photos, votes) {
+  const stats = new Map(photos.map((photo, index) => [photo.id, {photo, index, rating:1000, played:0, wins:0, ties:0}]));
+  const pairCounts = new Map();
+  for (const {a, b, outcome} of votes) {
+    const x = stats.get(a), y = stats.get(b);
+    if (!x || !y || x === y || !['a', 'b', 'tie'].includes(outcome)) continue;
+    const expected = 1 / (1 + 10 ** ((y.rating - x.rating) / 400));
+    const actual = outcome === 'a' ? 1 : outcome === 'b' ? 0 : 0.5;
+    const change = 32 * (actual - expected);
+    x.rating += change; y.rating -= change;
+    x.played++; y.played++;
+    if (outcome === 'a') x.wins++;
+    else if (outcome === 'b') y.wins++;
+    else { x.ties++; y.ties++; }
+    const key = pairKey(a, b);
+    pairCounts.set(key, (pairCounts.get(key) || 0) + 1);
+  }
+  const ranked = [...stats.values()].sort((a, b) => Number(b.played > 0) - Number(a.played > 0) || b.rating - a.rating || a.index - b.index);
+  return { ranked, pairCounts };
+}
+
+function nextPair(photos, votes, previous, random = Math.random) {
+  if (photos.length < 2) return null;
+  const { ranked, pairCounts } = standings(photos, votes);
+  const shuffled = ranked.map(item => ({...item, roll:random()})).sort((a, b) => a.played - b.played || a.roll - b.roll);
+  const a = shuffled[0];
+  let candidates = shuffled.slice(1);
+  if (previous && photos.length > 2) {
+    const last = pairKey(previous.a, previous.b);
+    candidates = candidates.filter(b => pairKey(a.photo.id, b.photo.id) !== last);
+  }
+  const priorMeetings = b => pairCounts.get(pairKey(a.photo.id, b.photo.id)) || 0;
+  candidates.sort((b, c) => b.played - c.played || priorMeetings(b) - priorMeetings(c) || b.roll - c.roll);
+  const b = candidates[0];
+  return random() < .5 ? {a:a.photo.id, b:b.photo.id} : {a:b.photo.id, b:a.photo.id};
+}
+
+function exportName(name) {
+  return name.replace(/\.[^.]+$/, '').replace(/[\u0000-\u001f\u007f<>:"/\\|?*]/g, '_').replace(/^[. ]+|[. ]+$/g, '').slice(0, 80) || 'photo';
+}
+
+
+function canvasOf(width, height) {
+  if (typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(width, height);
+  const canvas = document.createElement('canvas');
+  canvas.width = width; canvas.height = height;
+  return canvas;
+}
+
+function jpegOf(canvas, quality) {
+  if ('convertToBlob' in canvas) return canvas.convertToBlob({type:'image/jpeg', quality});
+  return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new PhotoError('unreadable')), 'image/jpeg', quality));
+}
+
+async function processPhoto(file) {
+  if (!file.size) throw new PhotoError('unreadable');
+  if (file.size > LIMITS.bytes) throw new PhotoError('fileLarge');
+  const original = photoHeader(await file.slice(0, 512 * 1024).arrayBuffer());
+  const target = fit(original.width, original.height, LIMITS.edge);
+  let bitmap, canvas, thumb;
+  try {
+    bitmap = await createImageBitmap(file, { imageOrientation:'from-image', resizeWidth:target.width, resizeHeight:target.height, resizeQuality:'high' });
+    let { width, height } = target;
+    canvas = canvasOf(width, height);
+    const ctx = canvas.getContext('2d', {alpha:false});
+    if (!ctx) throw new PhotoError('unreadable');
+    const draw = () => {
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, width, height);
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(bitmap, 0, 0, width, height);
+    };
+    draw();
+    // Avoid inflating already optimized inputs; don't chase tiny files at the expense of detail.
+    const budget = Math.min(LIMITS.target, Math.max(16_000, Math.floor(file.size * .90)));
+    let blob;
+    for (const quality of [.84, .76, .66, .56]) {
+      blob = await jpegOf(canvas, quality);
+      if (blob.size <= budget) break;
+    }
+    if (blob.size > budget && Math.max(width, height) > 1160) {
+      ({width, height} = fit(width, height, 1160));
+      canvas.width = width; canvas.height = height;
+      draw();
+      blob = await jpegOf(canvas, .66);
+    }
+    bitmap.close(); bitmap = null;
+    const t = fit(width, height, 300);
+    thumb = canvasOf(t.width, t.height);
+    thumb.getContext('2d', {alpha:false}).drawImage(canvas, 0, 0, t.width, t.height);
+    const thumbnail = await jpegOf(thumb, .72);
+    return { name:file.name, originalBytes:file.size, originalWidth:original.width, originalHeight:original.height,
+      bytes:blob.size, width, height, blob, thumbnail };
+  } catch (error) {
+    if (error instanceof PhotoError) throw error;
+    throw new PhotoError('unreadable');
+  } finally {
+    bitmap?.close();
+    if (canvas) { canvas.width = 1; canvas.height = 1; }
+    if (thumb) { thumb.width = 1; thumb.height = 1; }
+  }
+}
+
+// Stored ZIP entries avoid wasting CPU recompressing JPEGs.
+const CRC_TABLE = Uint32Array.from({length:256}, (_, n) => {
+  for (let i = 0; i < 8; i++) n = (n & 1) ? (0xedb88320 ^ (n >>> 1)) : (n >>> 1);
+  return n >>> 0;
+});
+
+function crc32(bytes) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) crc = CRC_TABLE[(crc ^ byte) & 255] ^ (crc >>> 8);
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+async function makeZip(entries) {
+  const parts = [], central = [];
+  let position = 0, centralSize = 0;
+  for (const {name, blob} of entries) {
+    const bytes = new TextEncoder().encode(name), len = blob.size;
+    const crc = crc32(new Uint8Array(await blob.arrayBuffer()));
+    const local = new Uint8Array(30 + bytes.length), l = new DataView(local.buffer);
+    l.setUint32(0, 0x04034b50, true); l.setUint16(4, 20, true);
+    l.setUint16(6, 0x800, true); l.setUint16(12, 0x21, true);
+    l.setUint32(14, crc, true); l.setUint32(18, len, true); l.setUint32(22, len, true);
+    l.setUint16(26, bytes.length, true); local.set(bytes, 30);
+    const entry = new Uint8Array(46 + bytes.length), d = new DataView(entry.buffer);
+    d.setUint32(0, 0x02014b50, true); d.setUint16(4, 20, true); d.setUint16(6, 20, true);
+    d.setUint16(8, 0x800, true); d.setUint16(14, 0x21, true); d.setUint32(16, crc, true);
+    d.setUint32(20, len, true); d.setUint32(24, len, true); d.setUint16(28, bytes.length, true);
+    d.setUint32(42, position, true); entry.set(bytes, 46);
+    parts.push(local, blob); central.push(entry);
+    position += local.length + len; centralSize += entry.length;
+  }
+  const end = new Uint8Array(22), d = new DataView(end.buffer);
+  d.setUint32(0, 0x06054b50, true); d.setUint16(8, entries.length, true); d.setUint16(10, entries.length, true);
+  d.setUint32(12, centralSize, true); d.setUint32(16, position, true);
+  return new Blob([...parts, ...central, end], {type:'application/zip'});
+}
+
+const COPY = {
+  brand:['摄影盲选','PHOTO CULLING'], session:['当前照片组','PHOTO SESSION'], import:['导入照片','Import photos'],
+  duel:['盲选擂台','Compare'], library:['全部照片','Library'], rank:['排名与精选','Shortlist'],
+  sample:['山野样片','Field studies'], personal:['我的照片','My photos'], demoTag:['示例集','DEMO'], privateTag:['本机','LOCAL'],
+  local:['照片仅在本机处理','Photos stay on this device'], clear:['清空照片组','Clear session'],
+  count:['照片','Photos'], votes:['已比较','Decisions'], picks:['已精选','Picks'], sourceBytes:['原图合计','Source size'], proxyBytes:['压缩副本','Preview size'],
+  smaller:['体积减少 {n}%','{n}% smaller'], larger:['体积增加 {n}%','{n}% larger'], sameSize:['体积接近原图','About the same size'],
+  duelHint:['每次选一张更喜欢的照片。文件名和分数会隐藏。','Choose your favorite. Names and scores stay hidden.'],
+  rankHint:['按盲选结果排序，再用星标确定要留下的照片。','Review your results and star the photos you want to keep.'],
+  libraryHint:['原图不会被修改。这里展示的是用于选片的轻量副本。','Originals stay untouched. These are lightweight copies for review.'],
+  rounds:['第 {n} / {total} 轮','Round {n} / {total}'], doneRounds:['已完成 {n} 轮','{n} decisions'],
+  chooseLeft:['选左图','Choose left'], chooseRight:['选右图','Choose right'], leftPhoto:['左图','Left photo'], rightPhoto:['右图','Right photo'],
+  inspect:['放大查看','Inspect'], tie:['平局','Tie'], skip:['跳过','Skip'], undo:['撤销','Undo'],
+  keyLeft:['选左','Left'], keyRight:['选右','Right'], keyUndo:['撤销','Undo'], keySkip:['跳过','Skip'], keyTie:['平局','Tie'],
+  peek:['点击照片可放大','Click a photo to inspect'], review:['查看排名','View ranking'],
+  finished:['本轮比较完成','Round complete'], finishedHint:['已经记录 {n} 次选择。可以查看排名，也可以再比几轮。','You made {n} decisions. Review the ranking or keep comparing.'],
+  keepGoing:['继续比较','Keep comparing'], tooFew:['至少需要两张照片','Add at least two photos'],
+  empty:['导入要挑选的照片','Add photos to compare'], emptyHint:['把照片拖进页面，或点“导入照片”。','Drop photos here or choose Import photos.'],
+  loadDemo:['试用样片','Load demo'], formats:['JPG、PNG、WebP · 单张最多 60 MB','JPG, PNG, WebP · up to 60 MB per image'],
+  demoUnavailable:['暂时无法加载样片，仍可导入自己的照片。','Demo photos are unavailable. You can still import your own.'],
+  drop:['松开即可导入照片','Drop photos to import'], loading:['正在读取照片组…','Opening session…'],
+  importing:['正在处理第 {n} / {total} 张','Processing photo {n} / {total}'], cancel:['停止导入','Stop import'],
+  stopping:['处理完当前照片后停止…','Stopping after the current photo…'], imported:['已导入 {n} 张照片','Imported {n} photos'],
+  importResult:['导入 {n} 张，跳过 {m} 张','Imported {n}, skipped {m}'], importBusy:['请等当前批次处理完成。','Wait for the current batch to finish.'],
+  duplicate:['已在照片组中','Already in this session'], shelf:['压缩副本已达 60 MB 上限','The 60 MB preview limit has been reached'],
+  maximum:['照片组最多 100 张','A session can hold up to 100 photos'],
+  fileLarge:['文件超过 60 MB','File exceeds 60 MB'], pixels:['超过 8000 万像素','Exceeds 80 megapixels'],
+  animated:['请导入静态照片','Use a still photo'], unreadable:['图片损坏或浏览器无法读取','Unreadable or unsupported by this browser'],
+  unsupported:['暂不支持此格式；请转成 JPG、PNG 或 WebP','Convert this file to JPG, PNG or WebP first'],
+  failedFiles:['未导入的文件','Skipped files'], unsaved:['浏览器无法保存，导出后再关闭页面。','Storage is unavailable. Export before closing this page.'],
+  picked:['已精选','Starred'], unpicked:['取消精选','Unstar'], pick:['加入精选','Star photo'], remove:['从照片组移除','Remove from session'],
+  download:['下载副本','Download copy'], top:['精选前 {n} 张','Star top {n}'], zip:['导出精选 ZIP','Export picks ZIP'],
+  sheet:['导出联系表','Export contact sheet'], rankingFile:['导出排名 CSV','Export ranking CSV'],
+  unplayed:['尚未比较','Unrated'], played:['比较 {n} 次 · 胜 {w} 次','{n} decisions · {w} wins'],
+  provisional:['分数只反映这组照片的相对偏好。比较越少，排名越容易变动。','Scores reflect your preferences in this set. A few comparisons can still change the order.'],
+  score:['偏好分','Rating'], preview:['压缩预览','Compressed preview'],
+  pickFirst:['请先用星标选出要导出的照片。','Star the photos you want to export first.'],
+  exported:['导出已开始','Download started'], exportFailed:['导出失败，请减少精选数量后重试。','Export failed. Try a smaller shortlist.'],
+  exporting:['正在准备文件…','Preparing files…'], clearTitle:['清空这个照片组？','Clear this photo session?'],
+  clearText:['此设备上的压缩副本、选择和排名会清除。原始照片不受影响。','This clears local copies, decisions, and ranking. Original files are untouched.'],
+  removeTitle:['移除这张照片？','Remove this photo?'], removeText:['与它有关的比较会一起移除，排名将重新计算。','Its comparisons will be removed and the ranking recalculated.'],
+  back:['返回','Go back'], confirm:['确认','Confirm'], close:['关闭','Close'], help:['使用说明','Help'],
+  helpDuel:['导入同一组照片。每次选左图、右图或平局；点照片可以放大，跳过不会计分。第一次进入会显示内置样片。','Import a set of photos. Choose left, right or tie. Click a photo to inspect it. Skipping does not count. A bundled demo opens on first visit.'],
+  helpRank:['比较优先安排出场较少的照片，分数按 Elo 方法更新。你可以继续比较，也可以直接到排名页标星和导出。','Photos with fewer comparisons are prioritized. Scores use Elo. Continue comparing or go to Shortlist to star and export your picks.'],
+  helpFiles:['支持静态 JPG、PNG、WebP，每张最多 60 MB、8000 万像素，最多 100 张。预览最长边不超过 1600 像素；RAW、HEIC 请先在相机或电脑上导出为 JPG。','Supports still JPG, PNG and WebP, up to 60 MB and 80 megapixels per image, 100 per session. Previews are at most 1600 px on the long edge. Convert RAW or HEIC to JPG first.'],
+  helpStorage:['浏览器逐张处理并保存压缩副本；导出的是这些副本，原图不会上传或覆盖。压缩预览会去掉拍摄元数据，透明背景会变白。','The browser processes one photo at a time and saves compressed copies. Exports use these copies. Originals are neither uploaded nor overwritten. Metadata is stripped and transparency is flattened to white.'],
+  credits:['样片来源','Demo photo credits'], voted:['已记录选择','Decision recorded'], skipped:['已换一组','Next pair'], undone:['已撤销上次选择','Last decision undone']
+};
+function translate(locale, key, values = {}) {
+  return (COPY[key]?.[locale === 'en' ? 1 : 0] ?? key).replace(/\{(\w+)\}/g, (_, name) => values[name] ?? '');
+}
+
+
+const $ = id => document.getElementById(id);
+const MAX_VOTES = 1000;
+const session = {photos:[], votes:[], goal:0, demo:false};
+const previewUrls = new Map();
+let usedUrls = new Set();
+let locale = 'zh', view = 'duel', pair = null, db, ready = false;
+let importing = false, cancelled = false, exporting = false, saved = true;
+let importIndex = 0, importTotal = 0, importCount = 0, errors = [];
+let inspectUrl, pendingConfirm, toastTimer;
+try { if (localStorage.getItem('frame-room-language') === 'en') locale = 'en'; } catch {}
+const t = (key, values) => translate(locale, key, values);
+const byId = id => session.photos.find(photo => photo.id === id);
+const rank = () => standings(session.photos, session.votes).ranked;
+const picks = () => rank().filter(row => row.photo.picked);
+const fmt = bytes => bytes >= 1024 ** 2 ? (bytes / 1024 ** 2).toFixed(1) + ' MB' : Math.round(bytes / 1024) + ' KB';
+const serial = n => String(n).padStart(2, '0');
+const initialGoal = () => Math.min(MAX_VOTES, session.photos.length * 2);
+
+function node(tag, cls, label) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (label !== undefined) e.textContent = label;
+  return e;
+}
+function button(label, action, cls = 'secondary', attrs = {}, disabled = false) {
+  const e = node('button', cls, label);
+  e.type = 'button'; e.dataset.action = action; e.disabled = disabled;
+  for (const [key, value] of Object.entries(attrs)) e.setAttribute(key, value);
+  return e;
+}
+function toast(key, values) {
+  clearTimeout(toastTimer);
+  $('toast').textContent = t(key, values);
+  toastTimer = setTimeout(() => { $('toast').textContent = ''; }, 3900);
+}
+function applyCopy() {
+  document.documentElement.lang = locale === 'en' ? 'en' : 'zh-CN';
+  document.title = 'Frame Room · ' + t('brand');
+  $('language').value = locale;
+  document.querySelectorAll('[data-copy]').forEach(e => { e.textContent = t(e.dataset.copy); });
+  document.querySelectorAll('[data-label]').forEach(e => { e.setAttribute('aria-label', t(e.dataset.label)); });
+  $('help-keys').replaceChildren(shortcuts());
+}
+function makeId() {
+  return globalThis.crypto?.randomUUID?.() ?? Date.now().toString(36) + Math.random().toString(36).slice(2);
+}
+
+function requestResult(request) {
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+function transactionDone(tx) {
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = resolve;
+    tx.onabort = () => reject(tx.error || new Error('Storage unavailable'));
+    tx.onerror = () => reject(tx.error);
+  });
+}
+async function restore() {
+  const request = indexedDB.open('frame-room-v1', 1);
+  request.onupgradeneeded = () => {
+    request.result.createObjectStore('photos', {keyPath:'id'});
+    request.result.createObjectStore('session');
+  };
+  db = await requestResult(request);
+  db.onversionchange = () => { db.close(); db = null; saved = false; };
+  const tx = db.transaction(['photos', 'session']);
+  const [photos, meta] = await Promise.all([
+    requestResult(tx.objectStore('photos').getAll()), requestResult(tx.objectStore('session').get('current'))
+  ]);
+  if (!meta) return false;
+  session.photos = photos.sort((a,b) => a.order - b.order);
+  const ids = new Set(photos.map(p => p.id));
+  session.votes = (meta.votes || []).filter(v => ids.has(v.a) && ids.has(v.b)).slice(0, MAX_VOTES);
+  session.goal = Math.min(MAX_VOTES, Math.max(meta.goal || 0, initialGoal()));
+  pair = nextPair(session.photos, session.votes, session.votes.at(-1));
+  return true;
+}
+async function save({put = [], remove = [], clear = false} = {}) {
+  if (session.demo) return;
+  if (!db) { saved = false; return; }
+  try {
+    const tx = db.transaction(['photos','session'], 'readwrite'), store = tx.objectStore('photos');
+    const done = transactionDone(tx);
+    if (clear) store.clear();
+    for (const id of remove) store.delete(id);
+    for (const photo of put) store.put(photo);
+    tx.objectStore('session').put({votes:session.votes, goal:session.goal}, 'current');
+    await done;
+  } catch {
+    if (saved) toast('unsaved');
+    saved = false;
+  }
+}
+
+function photoUrl(photo, thumbnail = false) {
+  const key = photo.id + (thumbnail ? ':thumb' : ':preview');
+  usedUrls.add(key);
+  if (!previewUrls.has(key)) previewUrls.set(key, URL.createObjectURL(thumbnail ? photo.thumbnail : photo.blob));
+  return previewUrls.get(key);
+}
+function releaseUnused() {
+  for (const [key,url] of previewUrls) {
+    if (!usedUrls.has(key)) { URL.revokeObjectURL(url); previewUrls.delete(key); }
+  }
+}
+function showPhoto(photo, label, thumb = false) {
+  const img = node('img');
+  img.src = photoUrl(photo, thumb);
+  img.alt = label; img.decoding = 'async';
+  if (thumb) img.loading = 'lazy';
+  return img;
+}
+
+function renderSidebar() {
+  $('session-name').textContent = t(session.demo ? 'sample' : 'personal');
+  $('session-tag').textContent = t(session.demo ? 'demoTag' : 'privateTag');
+  $('nav-count').textContent = serial(session.photos.length);
+  for (const b of $('views').querySelectorAll('button')) {
+    if (b.dataset.view === view) b.setAttribute('aria-current','page');
+    else b.removeAttribute('aria-current');
+  }
+  const total = session.photos.reduce((n,p) => n + p.originalBytes, 0);
+  const compressed = session.photos.reduce((n,p) => n + p.bytes, 0);
+  const metrics = [
+    ['count', serial(session.photos.length)], ['votes', serial(session.votes.length)],
+    ['picks', serial(session.photos.filter(p => p.picked).length)],
+    ['sourceBytes', fmt(total)], ['proxyBytes', fmt(compressed)]
+  ];
+  $('stats').replaceChildren(...metrics.map(([label, value], i) => {
+    const e = node('div','metric' + (i === 3 ? ' bytes' : ''));
+    e.append(node('span','',t(label)), node('strong','',value));
+    return e;
+  }));
+  $('clear-button').disabled = !session.photos.length || importing || exporting;
+  $('import-button').disabled = !ready || importing || exporting;
+}
+function heading(title, hint) {
+  const box = node('div','screen-head'), text = node('div','screen-title');
+  text.append(node('h1','',t(title)), node('p','',t(hint)));
+  box.append(text); return box;
+}
+function shortcuts() {
+  const list = node('div','shortcuts');
+  for (const [key, label] of [['1','keyLeft'],['2','keyRight'],['=','keyTie'],['→','keySkip'],['Ctrl/⌘ Z','keyUndo']]) {
+    const item = node('span'); item.append(node('kbd','',key), t(label)); list.append(item);
+  }
+  return list;
+}
+function emptyPanel(title, hint, values) {
+  const panel = node('div','empty');
+  panel.append(node('div','empty-symbol','◫'), node('h2','',t(title)), node('p','',t(hint,values)));
+  return panel;
+}
+function importEmpty() {
+  const panel = emptyPanel(session.photos.length === 1 ? 'tooFew' : 'empty', 'emptyHint');
+  const actions = node('div','empty-actions');
+  actions.append(button(t('import'),'import','primary',{},importing));
+  if (!session.photos.length) actions.append(button(t('loadDemo'),'demo','secondary',{},importing));
+  panel.append(actions, node('small','sheet-note',t('formats')));
+  return panel;
+}
+function duelCard(photo, side) {
+  const left = side === 'a', label = t(left ? 'leftPhoto' : 'rightPhoto');
+  const card = node('article','duel-card');
+  const frame = button('', 'inspect','frame',{'data-id':photo.id,'data-side':side, 'aria-label':t('inspect') + ': ' + label});
+  const index = node('span','frame-index',left ? 'A' : 'B'), zoom = node('span','zoom','⤢');
+  index.setAttribute('aria-hidden','true'); zoom.setAttribute('aria-hidden','true');
+  frame.append(showPhoto(photo,label), index, zoom);
+  const choose = button('', 'vote','choose',{'data-side':side},importing);
+  choose.append(node('kbd','',left ? '1' : '2'), t(left ? 'chooseLeft' : 'chooseRight'));
+  card.append(frame,choose); return card;
+}
+function renderDuel() {
+  const head = heading('duel','duelHint');
+  if (session.photos.length < 2) return [head,importEmpty()];
+  const complete = session.votes.length >= session.goal;
+  const round = node('div','round');
+  round.append(node('strong','', complete ? t('doneRounds',{n:session.votes.length}) : t('rounds',{n:session.votes.length + 1,total:session.goal})));
+  const meter = node('progress'); meter.max = session.goal || 1; meter.value = session.votes.length;
+  meter.setAttribute('aria-label',t('votes')); round.append(meter); head.append(round);
+  if (complete) {
+    const panel = emptyPanel('finished','finishedHint',{n:session.votes.length});
+    const actions = node('div','empty-actions');
+    actions.append(button(t('review'),'view','primary',{'data-view':'rank'}),
+      button(t('keepGoing'),'continue','secondary',{},importing || session.votes.length >= MAX_VOTES),
+      button(t('undo'),'undo','secondary',{},importing));
+    panel.append(actions); return [head,panel];
+  }
+  if (!pair || !byId(pair.a) || !byId(pair.b)) pair = nextPair(session.photos, session.votes, null);
+  const grid = node('div','duel-pair');
+  grid.append(duelCard(byId(pair.a),'a'), duelCard(byId(pair.b),'b'));
+  const actions = node('div','duel-actions');
+  actions.append(button('↶  ' + t('undo'),'undo','secondary',{},importing || !session.votes.length),
+    button(t('tie'),'vote','secondary',{'data-side':'tie'},importing),
+    button(t('skip') + '  →','skip','secondary',{},importing || session.photos.length < 3),
+    button(t('review'),'view','quiet',{'data-view':'rank'},!session.votes.length));
+  const foot = node('div','screen-foot'); foot.append(shortcuts(),node('span','',t('peek')));
+  return [head,grid,actions,foot];
+}
+function fileRow(row, index, ranked) {
+  const {photo, played, wins, rating} = row;
+  const item = node('article','file-row');
+  const order = node('div','position' + (ranked && played && index < 3 ? ' top' : ''), ranked && !played ? '—' : serial(index + 1));
+  const thumb = button('', 'inspect','file-thumb',{'data-id':photo.id,'aria-label':t('inspect') + ': ' + photo.name});
+  thumb.append(showPhoto(photo, '', true));
+  const name = node('div','file-name');
+  const title = node('strong','',photo.name); title.title = photo.name;
+  name.append(title, node('small','',photo.originalWidth + ' × ' + photo.originalHeight + ' → ' + photo.width + ' × ' + photo.height));
+  const detail = node('div','file-detail');
+  if (ranked) {
+    detail.append(node('b','',played ? Math.round(rating) + ' ' + t('score') : t('unplayed')));
+    if (played) detail.append(node('small','',t('played',{n:played,w:wins})));
+  } else {
+    detail.append(node('span','',fmt(photo.originalBytes) + ' → '), node('b','',fmt(photo.bytes)));
+    const reduction = Math.round((1 - photo.bytes / photo.originalBytes) * 100);
+    detail.append(node('small','',t(reduction > 0 ? 'smaller' : reduction < 0 ? 'larger' : 'sameSize',{n:Math.abs(reduction)})));
+  }
+  const actions = node('div','file-actions');
+  const pickLabel = t(photo.picked ? 'unpicked' : 'pick') + ': ' + photo.name;
+  actions.append(button(photo.picked ? '★' : '☆', 'pick', 'icon-button pick', {
+    'data-id':photo.id, 'aria-pressed':String(!!photo.picked), 'aria-label':pickLabel, title:pickLabel
+  }, importing || exporting));
+  const other = t(ranked ? 'download' : 'remove') + ': ' + photo.name;
+  actions.append(button(ranked ? '↓' : '×', ranked ? 'download' : 'remove', 'icon-button',
+    {'data-id':photo.id, 'aria-label':other, title:other},importing || exporting));
+  item.append(order,thumb,name,detail,actions); return item;
+}
+function renderList(ranked) {
+  const head = heading(ranked ? 'rank' : 'library',ranked ? 'rankHint' : 'libraryHint');
+  if (!session.photos.length) return [head,importEmpty()];
+  const rows = rank();
+  if (!ranked) rows.sort((a,b) => a.index - b.index);
+  const list = node('div','file-list'); list.append(...rows.map((row,i) => fileRow(row,i,ranked)));
+  if (!ranked) return [head,list];
+  const actions = node('div','exports'), count = Math.min(5,rows.filter(row => row.played).length);
+  const disabled = importing || exporting;
+  const noPicks = !picks().length;
+  actions.append(button(t('top',{n:count || 5}),'top','secondary',{},disabled || !count),
+    button(t('zip'),'zip','primary',{},disabled || noPicks),
+    button(t('sheet'),'sheet','secondary',{},disabled || noPicks),
+    button(t('rankingFile'),'csv','secondary',{},disabled || !session.votes.length));
+  return [head,actions,list,node('p','section-note',t('provisional'))];
+}
+function renderImport() {
+  const status = $('import-status'), stop = $('cancel-import'), meter = $('import-progress');
+  status.hidden = !importing && !errors.length;
+  stop.hidden = !importing;
+  stop.disabled = cancelled;
+  meter.hidden = !importing;
+  meter.max = importTotal || 1; meter.value = Math.max(0,importIndex - 1);
+  $('import-label').textContent = importing ? (cancelled ? t('stopping') : t('importing',{n:importIndex,total:importTotal})) :
+    t('importResult',{n:importCount,m:errors.length});
+  status.querySelector('.error-details')?.remove();
+  if (errors.length && !importing) {
+    const details = node('details','error-details');
+    details.append(node('summary','',t('failedFiles')));
+    const list = node('ul','import-errors');
+    for (const error of errors) list.append(node('li','',error.name + ' — ' + t(error.code)));
+    details.append(list); status.append(details);
+  }
+}
+function render() {
+  renderSidebar(); renderImport();
+  usedUrls = new Set();
+  let contents;
+  if (!ready) contents = [node('p','section-note',t('loading'))];
+  else contents = view === 'duel' ? renderDuel() : renderList(view === 'rank');
+  $('screen').replaceChildren(...contents);
+  if (!saved && !session.demo) $('screen').append(node('p','section-note',t('unsaved')));
+  releaseUnused();
+}
+
+async function workerPhoto(file) {
+  if (typeof Worker === 'undefined' || typeof OffscreenCanvas === 'undefined') return processPhoto(file);
+  const url = URL.createObjectURL(new Blob([WORKER_SOURCE], {type:'text/javascript'}));
+  let worker, timer;
+  try {
+    return await new Promise((resolve, reject) => {
+      try { worker = new Worker(url); } catch (error) { reject(error); return; }
+      timer = setTimeout(() => reject(new PhotoError('unreadable')), 45_000);
+      worker.onmessage = ({data}) => data.error ? reject(new PhotoError(data.error)) : resolve(data.photo);
+      worker.onerror = reject;
+      worker.postMessage({id:0,file});
+    });
+  } catch (error) {
+    if (error instanceof PhotoError) throw error;
+    worker?.terminate();
+    return processPhoto(file);
+  } finally {
+    clearTimeout(timer); worker?.terminate(); URL.revokeObjectURL(url);
+  }
+}
+
+async function importPhotos(files, demo = false) {
+  if (importing || exporting) { toast('importBusy'); return; }
+  if (!files.length) return;
+  importing = true; cancelled = false; importCount = 0; errors = [];
+  importIndex = 1; importTotal = files.length;
+  render();
+  let order = session.photos.reduce((n,p) => Math.max(n,p.order),0);
+  let occupied = session.photos.reduce((n,p) => n + p.bytes + p.thumbnail.size,0);
+  for (const file of files) {
+    if (cancelled) break;
+    const replaceDemo = !demo && session.demo;
+    if (!replaceDemo && session.photos.length >= LIMITS.count) {
+      errors.push({name:file.name,code:'maximum'}); break;
+    }
+    const key = [file.name,file.size,file.lastModified].join('|');
+    try {
+      if (!replaceDemo && session.photos.some(photo => photo.key === key)) throw new PhotoError('duplicate');
+      const result = await workerPhoto(file);
+      if ((replaceDemo ? 0 : occupied) + result.bytes + result.thumbnail.size > LIMITS.shelf) throw new PhotoError('shelf');
+      if (replaceDemo) {
+        session.photos = []; session.votes = []; session.goal = 0; pair = null;
+        session.demo = false; occupied = 0; order = 0;
+      }
+      const photo = {...result, key, id:makeId(), picked:false, order:++order};
+      session.photos.push(photo);
+      occupied += photo.bytes + photo.thumbnail.size;
+      session.goal = Math.min(MAX_VOTES, Math.max(session.goal, initialGoal(), session.votes.length + session.photos.length));
+      importCount++;
+      await save({put:[photo]});
+    } catch (error) {
+      errors.push({name:file.name, code:error.code || 'unreadable'});
+    }
+    importIndex = Math.min(importTotal, importIndex + 1);
+    renderImport();
+  }
+  importing = false;
+  if (importCount) { pair = nextPair(session.photos,session.votes,pair); view = 'duel'; }
+  render();
+  if (!demo) toast(errors.length ? 'importResult' : 'imported',{n:importCount,m:errors.length});
+}
+async function loadDemo() {
+  if (session.photos.length || importing) return;
+  session.demo = true;
+  importing = true; cancelled = false; importIndex = 1; importTotal = DEMO.length;
+  render();
+  const results = await Promise.allSettled(DEMO.map(async sample => {
+    let bytes;
+    if (sample.data) bytes = Uint8Array.from(atob(sample.data), c => c.charCodeAt(0));
+    else {
+      const response = await fetch('./demo/' + encodeURIComponent(sample.name), {signal:AbortSignal.timeout(8000)});
+      if (!response.ok) throw new Error('Demo photo unavailable');
+      bytes = await response.blob();
+    }
+    return new File([bytes], sample.name, {type:'image/jpeg',lastModified:0});
+  }));
+  importing = false;
+  if (cancelled) { session.demo = false; render(); return; }
+  const files = results.filter(result => result.status === 'fulfilled').map(result => result.value);
+  if (!files.length) { session.demo = false; render(); toast('demoUnavailable'); return; }
+  await importPhotos(files,true);
+}
+
+function pickPair(outcome) {
+  if (view !== 'duel' || importing || !pair || session.votes.length >= session.goal) return;
+  session.votes.push({...pair,outcome});
+  pair = nextPair(session.photos,session.votes,pair);
+  void save(); render(); toast('voted');
+}
+function undo() {
+  if (importing || !session.votes.length) return;
+  const previous = session.votes.pop();
+  pair = {a:previous.a,b:previous.b}; view = 'duel';
+  void save(); render(); toast('undone');
+}
+function skip() {
+  if (view !== 'duel' || importing || !pair || session.photos.length < 3 || session.votes.length >= session.goal) return;
+  pair = nextPair(session.photos,session.votes,pair);
+  render(); toast('skipped');
+}
+function inspect(photo, side) {
+  if (!photo) return;
+  const blind = side === 'a' || side === 'b';
+  const label = blind ? t(side === 'a' ? 'leftPhoto' : 'rightPhoto') : photo.name;
+  if (inspectUrl) URL.revokeObjectURL(inspectUrl);
+  inspectUrl = URL.createObjectURL(photo.blob);
+  $('inspect-title').textContent = label;
+  $('inspect-image').src = inspectUrl; $('inspect-image').alt = label;
+  $('inspect-caption').textContent = blind ? t('preview') : t('preview') + ' · ' + photo.width + ' × ' + photo.height + ' · ' + fmt(photo.bytes);
+  $('inspect-dialog').showModal();
+}
+function confirmAction(title,text,run) {
+  $('confirm-title').textContent = t(title); $('confirm-text').textContent = t(text);
+  pendingConfirm = run; $('confirm-dialog').showModal();
+}
+function download(blob, filename) {
+  const url = URL.createObjectURL(blob), a = node('a');
+  a.href = url; a.download = filename;
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 15_000);
+}
+function fileName(row,index) {
+  return serial(index + 1) + '-' + exportName(row.photo.name) + '.jpg';
+}
+function csvField(value) {
+  let s = String(value);
+  if (/^\s*[=+\-@]/.test(s) || /^[\t\r\n]/.test(s)) s = "'" + s;
+  return '"' + s.replaceAll('"','""') + '"';
+}
+async function contactSheet(rows) {
+  const cols = Math.min(5, rows.length), pad = 26, gap = 10, cell = 330, tile = 220, step = tile + 46;
+  const width = pad * 2 + cols * cell + (cols - 1) * gap;
+  const height = 98 + Math.ceil(rows.length / cols) * step + pad;
+  const canvas = canvasOf(width,height);
+  try {
+    const ctx = canvas.getContext('2d',{alpha:false});
+    ctx.fillStyle = '#ecebe3'; ctx.fillRect(0,0,width,height);
+    ctx.fillStyle = '#232822'; ctx.font = '600 29px sans-serif';
+    ctx.fillText('Frame Room',pad,44);
+    ctx.fillStyle = '#59645b'; ctx.font = '14px sans-serif';
+    ctx.fillText(t('sheet').replace(/^导出\s*|^Export\s+/,''),pad,67);
+    for (let i = 0; i < rows.length; i++) {
+      const {photo} = rows[i], x = pad + i % cols * (cell + gap), y = 98 + Math.floor(i / cols) * step;
+      const bitmap = await createImageBitmap(photo.thumbnail);
+      try {
+        const scale = Math.min(cell / bitmap.width, tile / bitmap.height);
+        const w = bitmap.width * scale, h = bitmap.height * scale;
+        ctx.fillStyle = '#222723'; ctx.fillRect(x,y,cell,tile);
+        ctx.drawImage(bitmap,x + (cell - w) / 2,y + (tile - h) / 2,w,h);
+      } finally { bitmap.close(); }
+      ctx.fillStyle = '#222723'; ctx.font = '14px sans-serif';
+      const line = serial(i + 1) + '   ' + photo.name;
+      let label = line;
+      while (label.length > 1 && ctx.measureText(label + '…').width > cell) label = label.slice(0,-1);
+      ctx.fillText(label + (label === line ? '' : '…'),x,y + tile + 23);
+    }
+    return await jpegOf(canvas,.9);
+  } finally { canvas.width = 1; canvas.height = 1; }
+}
+async function exportPicks(kind) {
+  if (exporting || importing) return;
+  const rows = picks();
+  if (!rows.length) { toast('pickFirst'); return; }
+  exporting = true; render(); toast('exporting');
+  try {
+    if (kind === 'zip') {
+      const archive = await makeZip(rows.map((row,i) => ({name:fileName(row,i),blob:row.photo.blob})));
+      download(archive,'frame-room-picks.zip');
+    } else {
+      download(await contactSheet(rows),'frame-room-contact-sheet.jpg');
+    }
+    toast('exported');
+  } catch { toast('exportFailed'); }
+  finally { exporting = false; render(); }
+}
+
+$('file-input').addEventListener('change', e => {
+  const files = [...e.target.files]; e.target.value = ''; void importPhotos(files);
+});
+$('language').addEventListener('change', e => {
+  locale = e.target.value;
+  try { localStorage.setItem('frame-room-language',locale); } catch {}
+  applyCopy(); render();
+});
+$('inspect-dialog').addEventListener('close', () => {
+  if (inspectUrl) URL.revokeObjectURL(inspectUrl);
+  inspectUrl = null; $('inspect-image').removeAttribute('src');
+});
+document.addEventListener('click', event => {
+  const target = event.target.closest('[data-action]');
+  if (!target || target.disabled) return;
+  const action = target.dataset.action, photo = byId(target.dataset.id);
+  if (action === 'import') $('file-input').click();
+  if (action === 'demo') void loadDemo();
+  if (action === 'help') $('help-dialog').showModal();
+  if (action === 'close') target.closest('dialog').close();
+  if (action === 'view') { view = target.dataset.view; render(); }
+  if (action === 'inspect') inspect(photo,target.dataset.side);
+  if (action === 'vote') pickPair(target.dataset.side);
+  if (action === 'skip') skip();
+  if (action === 'undo') undo();
+  if (action === 'cancel') { cancelled = true; renderImport(); }
+  if (action === 'continue') {
+    session.goal = Math.min(MAX_VOTES,session.votes.length + session.photos.length);
+    pair = nextPair(session.photos,session.votes,pair); void save(); render();
+  }
+  if (action === 'pick' && photo) { photo.picked = !photo.picked; void save({put:[photo]}); render(); }
+  if (action === 'top') {
+    const top = rank().filter(row => row.played).slice(0,5).map(row => row.photo);
+    for (const p of top) p.picked = true;
+    void save({put:top}); render();
+  }
+  if (action === 'download' && photo) { download(photo.blob,exportName(photo.name) + '-preview.jpg'); toast('exported'); }
+  if (action === 'zip' || action === 'sheet') void exportPicks(action);
+  if (action === 'csv') {
+    const rows = rank().map(({photo,rating,played,wins,ties},i) =>
+      [played ? i + 1 : '',photo.name,played ? Math.round(rating) : '',played,wins,ties,photo.picked ? 1 : 0,photo.originalBytes,photo.bytes]);
+    const head = 'rank,filename,rating,decisions,wins,ties,starred,original_bytes,preview_bytes';
+    const csv = head + '\r\n' + rows.map(row => row.map(csvField).join(',')).join('\r\n');
+    download(new Blob(['\uFEFF',csv],{type:'text/csv;charset=utf-8'}),'frame-room-ranking.csv'); toast('exported');
+  }
+  if (action === 'remove' && photo) confirmAction('removeTitle','removeText', () => {
+    session.photos = session.photos.filter(p => p !== photo);
+    session.votes = session.votes.filter(v => v.a !== photo.id && v.b !== photo.id);
+    session.goal = Math.max(session.votes.length,initialGoal());
+    pair = nextPair(session.photos,session.votes,pair); void save({remove:[photo.id]}); render();
+  });
+  if (action === 'clear') confirmAction('clearTitle','clearText', () => {
+    session.photos = []; session.votes = []; session.goal = 0; session.demo = false;
+    errors = []; pair = null; view = 'duel'; void save({clear:true}); render();
+  });
+  if (action === 'confirm') {
+    $('confirm-dialog').close();
+    const run = pendingConfirm; pendingConfirm = null; run?.();
+  }
+});
+document.addEventListener('keydown', event => {
+  if (view !== 'duel' || event.repeat || document.querySelector('dialog[open]') ||
+      event.target.matches?.('input,select,textarea,[contenteditable]')) return;
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'z') { event.preventDefault(); undo(); return; }
+  if (event.ctrlKey || event.metaKey || event.altKey) return;
+  const choice = {'1':'a','2':'b','=':'tie'}[event.key];
+  if (choice && pair) { event.preventDefault(); pickPair(choice); }
+  if (event.key === 'ArrowRight' && pair) { event.preventDefault(); skip(); }
+});
+let dragDepth = 0;
+const draggedFiles = event => event.dataTransfer?.types.includes('Files');
+document.addEventListener('dragenter', event => {
+  if (!draggedFiles(event)) return;
+  event.preventDefault(); dragDepth++; $('drop-overlay').hidden = false;
+});
+document.addEventListener('dragover', event => { if (draggedFiles(event)) event.preventDefault(); });
+document.addEventListener('dragleave', event => {
+  if (!draggedFiles(event)) return;
+  if (--dragDepth <= 0) { dragDepth = 0; $('drop-overlay').hidden = true; }
+});
+document.addEventListener('drop', event => {
+  if (!draggedFiles(event)) return;
+  event.preventDefault(); dragDepth = 0; $('drop-overlay').hidden = true;
+  if (ready) void importPhotos([...event.dataTransfer.files]);
+});
+
+for (const photo of DEMO) {
+  const li = node('li'), a = node('a','',photo.author);
+  a.href = photo.url; a.target = '_blank'; a.rel = 'noopener noreferrer'; li.append(a); $('credits-list').append(li);
+}
+applyCopy(); render();
+let restored = false;
+try { restored = await restore(); } catch { saved = false; }
+ready = true; render();
+if (!restored) await loadDemo();
+
+</script>
+</body>
+</html>
