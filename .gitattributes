@@ -1,0 +1,5 @@
+* text=auto eol=lf
+index.html linguist-generated
+dist/index.html linguist-generated
+*.jpg binary
+*.png binary

@@ -1,0 +1,11 @@
+{
+  "name": "frame-room",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test tests/core.test.mjs",
+    "start": "node serve.mjs"
+  }
+}
